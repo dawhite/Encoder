@@ -64,12 +64,20 @@ typedef struct {
 	IO_REG_TYPE            pin2_bitmask;
 	uint8_t                state;
 	int32_t                position;
+	// Added a modulo flag and a "positions per revolution" (ppr) field to the struct
+	uint8_t                do_modulo;
+	int32_t                ppr;
 } Encoder_internal_state_t;
 
 class Encoder
 {
 public:
-	Encoder(uint8_t pin1, uint8_t pin2) {
+	// Added a "positions per revolution" (ppr) argument to the init
+	// so encoders capable of rotating many times don't exceed the range
+	// of int32_t as the position value builds up. The update function 
+	// now modulos the position value by ppr. The default value of 0 
+	// preserves original functionality.
+	Encoder(uint8_t pin1, uint8_t pin2, int32_t ppr=0) {
 		#ifdef INPUT_PULLUP
 		pinMode(pin1, INPUT_PULLUP);
 		pinMode(pin2, INPUT_PULLUP);
@@ -92,6 +100,9 @@ public:
 		if (DIRECT_PIN_READ(encoder.pin1_register, encoder.pin1_bitmask)) s |= 1;
 		if (DIRECT_PIN_READ(encoder.pin2_register, encoder.pin2_bitmask)) s |= 2;
 		encoder.state = s;
+		if (ppr != 0) encoder.do_modulo = 1;
+		else encoder.do_modulo = 0;
+		encoder.ppr = ppr;
 #ifdef ENCODER_USE_INTERRUPTS
 		interrupts_in_use = attach_interrupt(pin1, &encoder);
 		interrupts_in_use += attach_interrupt(pin2, &encoder);
@@ -298,18 +309,26 @@ public:
 		switch (state) {
 			case 1: case 7: case 8: case 14:
 				arg->position++;
-				return;
+				// return;
+				break;
 			case 2: case 4: case 11: case 13:
 				arg->position--;
-				return;
+				// return;
+				break;
 			case 3: case 12:
 				arg->position += 2;
-				return;
+				// return;
+				break;
 			case 6: case 9:
 				arg->position -= 2;
-				return;
+				// return;
+				break;
 		}
 #endif
+		// Modulo the current position value by the ppr. This approach may
+		// slow things down a little, but is architecture agnostic.
+		if (arg->do_modulo == 1) arg->position %= arg->ppr;
+		// arg->position %= arg->ppr;
 	}
 private:
 /*
