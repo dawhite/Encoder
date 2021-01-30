@@ -328,7 +328,6 @@ public:
 		// Modulo the current position value by the ppr. This approach may
 		// slow things down a little, but is architecture agnostic.
 		if (arg->do_modulo == 1) arg->position %= arg->ppr;
-		// arg->position %= arg->ppr;
 	}
 private:
 /*
